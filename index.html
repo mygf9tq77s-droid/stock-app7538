@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Учёт утеплителя</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, system-ui, sans-serif;
+      background: #f2f2f7;
+      padding: 16px;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+    }
+    .app {
+      max-width: 500px;
+      width: 100%;
+      background: white;
+      border-radius: 16px;
+      padding: 20px 16px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+    }
+    h2 {
+      font-size: 24px;
+      font-weight: 600;
+      margin: 0 0 16px 0;
+      color: #1c1c1e;
+    }
+    .form-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .form-row select,
+    .form-row input,
+    .form-row button {
+      font-size: 16px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid #d1d1d6;
+      background: #f9f9f9;
+      flex: 1 1 auto;
+      min-width: 70px;
+      outline: none;
+      transition: border 0.2s;
+    }
+    .form-row select:focus,
+    .form-row input:focus {
+      border-color: #007aff;
+      background: white;
+    }
+    .form-row button {
+      flex: 0 1 auto;
+      background: #007aff;
+      color: white;
+      border: none;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .form-row button:active {
+      background: #005bbf;
+    }
+    .filter-row {
+      margin-bottom: 16px;
+    }
+    .filter-row input {
+      width: 100%;
+      padding: 10px 12px;
+      font-size: 16px;
+      border-radius: 10px;
+      border: 1px solid #d1d1d6;
+      background: #f9f9f9;
+      outline: none;
+    }
+    .filter-row input:focus {
+      border-color: #007aff;
+      background: white;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 15px;
+      background: white;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+    }
+    th {
+      background: #e9ecef;
+      color: #1c1c1e;
+      font-weight: 600;
+      padding: 10px 8px;
+      text-align: left;
+      font-size: 14px;
+    }
+    td {
+      padding: 10px 8px;
+      border-bottom: 1px solid #e5e5ea;
+      vertical-align: middle;
+    }
+    .editable {
+      cursor: pointer;
+      background: #f0f8ff;
+      padding: 4px 8px;
+      border-radius: 6px;
+      display: inline-block;
+      min-width: 36px;
+      font-weight: 500;
+      transition: background 0.1s;
+    }
+    .editable:hover {
+      background: #d4edff;
+    }
+    .btn-del {
+      background: #ff3b30;
+      color: white;
+      border: none;
+      padding: 4px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: opacity 0.2s;
+    }
+    .btn-del:active {
+      opacity: 0.6;
+    }
+    /* Адаптация для маленьких экранов */
+    @media (max-width: 420px) {
+      .form-row select,
+      .form-row input {
+        font-size: 15px;
+        padding: 8px 10px;
+        min-width: 60px;
+      }
+      .form-row button {
+        padding: 8px 16px;
+        font-size: 15px;
+      }
+      th, td {
+        font-size: 13px;
+        padding: 8px 4px;
+      }
+      .editable {
+        font-size: 13px;
+        padding: 2px 6px;
+      }
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+  <h2>📦 Учёт утеплителя</h2>
+
+  <div class="form-row">
+    <select id="density">
+      <option value="150">150 гр</option>
+      <option value="200">200 гр</option>
+      <option value="300">300 гр</option>
+      <option value="400">400 гр</option>
+      <option value="500">500 гр</option>
+    </select>
+    <select id="thickness">
+      <option value="5">5 мм</option>
+      <option value="8">8 мм</option>
+      <option value="10">10 мм</option>
+      <option value="15">15 мм</option>
+      <option value="20">20 мм</option>
+      <option value="30">30 мм</option>
+      <option value="50">50 мм</option>
+    </select>
+    <input type="number" id="width" placeholder="Ширина (мм)" value="150" step="any" />
+    <input type="number" id="qty" placeholder="Кол-во (шт)" value="0" step="1" />
+    <button onclick="addItem()">➕ Добавить</button>
+  </div>
+
+  <div class="filter-row">
+    <input type="text" id="filter" placeholder="Фильтр (например, 300гр 20мм)" oninput="renderTable()" />
+  </div>
+
+  <table id="stockTable">
+    <thead>
+      <tr><th>Плотность</th><th>Толщина</th><th>Ширина</th><th>Кол-во</th><th></th></tr>
+    </thead>
+    <tbody id="tableBody"></tbody>
+  </table>
+</div>
+
+<script>
+  let items = JSON.parse(localStorage.getItem('stockItems')) || [];
+
+  function renderTable() {
+    const filter = document.getElementById('filter').value.toLowerCase();
+    const filtered = items.filter(item => {
+      const str = `${item.density}гр ${item.thickness}мм шир.${item.width}мм`.toLowerCase();
+      return str.includes(filter);
+    });
+
+    const tbody = document.getElementById('tableBody');
+    if (filtered.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:20px; color:#8e8e93;">Нет записей</td></tr>`;
+    } else {
+      tbody.innerHTML = filtered.map((item, idx) => {
+        const realIdx = items.indexOf(item);
+        return `
+          <tr>
+            <td>${item.density} гр</td>
+            <td>${item.thickness} мм</td>
+            <td><span class="editable" onclick="editField(${realIdx}, 'width')">${item.width}</span> мм</td>
+            <td><span class="editable" onclick="editField(${realIdx}, 'qty')">${item.qty}</span> шт</td>
+            <td><button class="btn-del" onclick="deleteItem(${realIdx})">✕</button></td>
+          </tr>
+        `;
+      }).join('');
+    }
+    localStorage.setItem('stockItems', JSON.stringify(items));
+  }
+
+  function addItem() {
+    const density = parseInt(document.getElementById('density').value);
+    const thickness = parseInt(document.getElementById('thickness').value);
+    const width = parseFloat(document.getElementById('width').value) || 0;
+    const qty = parseInt(document.getElementById('qty').value) || 0;
+    if (width <= 0 || qty <= 0) {
+      alert('Ширина и количество должны быть положительными');
+      return;
+    }
+
+    const existing = items.find(item => 
+      item.density === density && 
+      item.thickness === thickness && 
+      item.width === width
+    );
+
+    if (existing) {
+      existing.qty += qty;
+    } else {
+      items.push({ density, thickness, width, qty });
+    }
+
+    renderTable();
+    // Очищаем только количество, ширину оставляем
+    document.getElementById('qty').value = '';
+    // Ширину НЕ сбрасываем – остаётся введённое значение
+  }
+
+  function deleteItem(index) {
+    if (confirm('Удалить запись?')) {
+      items.splice(index, 1);
+      renderTable();
+    }
+  }
+
+  function editField(index, field) {
+    const newVal = prompt(`Введите новое значение для ${field === 'width' ? 'ширины' : 'количества'}`, items[index][field]);
+    if (newVal === null) return;
+    const num = parseFloat(newVal);
+    if (isNaN(num) || num < 0) {
+      alert('Введите положительное число');
+      return;
+    }
+    items[index][field] = num;
+    renderTable();
+  }
+
+  renderTable();
+</script>
+</body>
+</html>
