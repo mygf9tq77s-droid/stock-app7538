@@ -6,47 +6,49 @@
     <title>Super Platformer</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
             background: #111;
+            touch-action: none;
+            font-family: Arial, sans-serif;
             display: flex;
             justify-content: center;
             align-items: center;
-            height: 100vh;
-            width: 100vw;
-            overflow: hidden;
-            touch-action: none;
-            font-family: Arial, sans-serif;
         }
         #gameContainer {
             position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
             background: #1a1a2e;
-            border-radius: 12px;
-            box-shadow: 0 0 30px rgba(0,0,0,0.8);
-            max-width: 100vmin;
-            max-height: 100vmin;
-            aspect-ratio: 16 / 9;
         }
         canvas {
             display: block;
             width: 100%;
             height: 100%;
+            object-fit: contain; /* сохраняем пропорции 16:9, остальное — чёрные поля */
             background: #87CEEB;
             touch-action: none;
-            border-radius: 12px;
+            border-radius: 0;
         }
         #ui {
             position: absolute;
-            top: 10px;
-            left: 10px;
-            right: 10px;
+            top: 2%;
+            left: 2%;
+            right: 2%;
             display: flex;
             justify-content: space-between;
             color: white;
-            font-size: 18px;
+            font-size: clamp(16px, 3vmin, 28px);
             font-weight: bold;
             text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
             pointer-events: none;
             padding: 0 5px;
+            z-index: 5;
         }
         #ui span {
             background: rgba(0,0,0,0.5);
@@ -55,12 +57,12 @@
         }
         #restartBtn {
             position: absolute;
-            bottom: 20px;
-            right: 20px;
+            bottom: 3%;
+            right: 3%;
             background: #e94560;
             border: none;
             color: white;
-            font-size: 16px;
+            font-size: clamp(14px, 2vmin, 22px);
             padding: 8px 20px;
             border-radius: 30px;
             cursor: pointer;
@@ -75,19 +77,16 @@
             left: 50%;
             transform: translate(-50%, -50%);
             color: white;
-            font-size: 32px;
+            font-size: clamp(24px, 5vmin, 48px);
             font-weight: bold;
             text-shadow: 0 0 20px rgba(0,0,0,0.9);
-            background: rgba(0,0,0,0.6);
+            background: rgba(0,0,0,0.7);
             padding: 20px 40px;
             border-radius: 20px;
             display: none;
             text-align: center;
             pointer-events: none;
             z-index: 20;
-        }
-        @media (orientation: portrait) {
-            #gameContainer { max-width: 90vmin; max-height: 90vmin; }
         }
     </style>
 </head>
@@ -112,6 +111,7 @@ const scoreDisplay = document.getElementById('scoreDisplay');
 const messageEl = document.getElementById('message');
 const restartBtn = document.getElementById('restartBtn');
 
+// Логический размер игрового поля (16:9)
 const W = 960;
 const H = 540;
 canvas.width = W;
@@ -129,10 +129,10 @@ const MOVE_SPEED = 4;
 const MAX_LEVEL = 5;
 
 // ============================================================
-//   УРОВНИ (TileMap) — 5 уникальных карт
+//   УРОВНИ (TileMap) — исправлены: S теперь стоит на платформе
 // ============================================================
 const LEVELS = [
-    // Уровень 1 — простой
+    // Уровень 1
     [
         "                              ",
         "                              ",
@@ -145,9 +145,9 @@ const LEVELS = [
         "  #   E          #   E        ",
         "  #              #            ",
         "  ################   C   F    ",
-        "  ###############S#####   #   "
+        "  ##########S#######   #   #  "  // S вставлен в платформу
     ],
-    // Уровень 2 — больше врагов и ям
+    // Уровень 2
     [
         "                              ",
         "                              ",
@@ -160,9 +160,9 @@ const LEVELS = [
         "  #   E       #          E    ",
         "  #           #               ",
         "  #############   C   F       ",
-        "  #############S#####   #     "
+        "  #####S#########   #   #     "  // S на платформе
     ],
-    // Уровень 3 — узкие платформы
+    // Уровень 3
     [
         "                              ",
         "                              ",
@@ -175,9 +175,9 @@ const LEVELS = [
         " #         #    E             ",
         " #         #                  ",
         " ##########    C   F          ",
-        " ##########S#########         "
+        " ###S#######   #   #          "  // S на платформе
     ],
-    // Уровень 4 — много врагов
+    // Уровень 4
     [
         "                              ",
         "                              ",
@@ -190,9 +190,9 @@ const LEVELS = [
         " #         #    E    E        ",
         " #    E    #                  ",
         " #########     C   F          ",
-        " #########S#########          "
+        " ####S####       #   #        "  // S на платформе
     ],
-    // Уровень 5 — финальный, максимум препятствий
+    // Уровень 5
     [
         "                              ",
         "                              ",
@@ -205,7 +205,7 @@ const LEVELS = [
         " #   E   #    E    E          ",
         " #       #                    ",
         " #########    C   F           ",
-        " #########S#########          "
+        " ####S####    #   #           "  // S на платформе
     ]
 ];
 
@@ -215,14 +215,14 @@ const LEVELS = [
 let currentLevel = 0;
 let score = 0;
 let gameRunning = true;
-let gameOver = false;
-let win = false;
+let respawning = false;
 
 let platforms = [];
 let enemies = [];
 let coins = [];
 let finish = null;
 let player = { x: 0, y: 0, w: PLAYER_W, h: PLAYER_H, vx: 0, vy: 0, onGround: false };
+let startPos = { x: 0, y: 0 };
 let camera = { x: 0, y: 0 };
 
 // Джойстики
@@ -246,8 +246,7 @@ function loadLevel(levelIndex) {
     player.vx = 0;
     player.vy = 0;
     player.onGround = false;
-    gameOver = false;
-    win = false;
+    respawning = false;
     messageEl.style.display = 'none';
 
     const rows = map.length;
@@ -277,10 +276,42 @@ function loadLevel(levelIndex) {
                     finish = { x, y, w: TILE, h: TILE };
                     break;
                 case 'S':
+                    startPos.x = x;
+                    startPos.y = y;
                     player.x = x;
                     player.y = y;
                     break;
             }
+        }
+    }
+
+    // Коррекция: если под игроком нет платформы, опускаем на ближайшую снизу
+    let found = false;
+    for (let p of platforms) {
+        if (player.x + player.w > p.x && player.x < p.x + p.w) {
+            if (p.y >= player.y + player.h) {
+                // Платформа ниже
+                const dist = p.y - (player.y + player.h);
+                if (dist < 100) { // если близко
+                    player.y = p.y - player.h;
+                    found = true;
+                    break;
+                }
+            }
+        }
+    }
+    if (!found) {
+        // Если нет платформы под ногами, ищем самую верхнюю платформу и ставим на неё
+        let highest = null;
+        for (let p of platforms) {
+            if (p.x + p.w > player.x && p.x < player.x + player.w) {
+                if (!highest || p.y < highest.y) {
+                    highest = p;
+                }
+            }
+        }
+        if (highest) {
+            player.y = highest.y - player.h;
         }
     }
 
@@ -296,8 +327,30 @@ function rectCollide(a, b) {
            a.y < b.y + b.h && a.y + a.h > b.y;
 }
 
+function respawnPlayer() {
+    // Возрождаем на стартовой позиции без потери монет и прогресса
+    player.x = startPos.x;
+    player.y = startPos.y;
+    player.vx = 0;
+    player.vy = 0;
+    player.onGround = false;
+    // Корректируем позицию, чтобы не провалиться
+    for (let p of platforms) {
+        if (player.x + player.w > p.x && player.x < p.x + p.w) {
+            if (p.y >= player.y + player.h) {
+                const dist = p.y - (player.y + player.h);
+                if (dist < 100) {
+                    player.y = p.y - player.h;
+                    break;
+                }
+            }
+        }
+    }
+    respawning = false;
+}
+
 function updatePlayer() {
-    if (!gameRunning || gameOver || win) return;
+    if (!gameRunning || respawning) return;
 
     let moveX = leftJoystick.active ? leftJoystick.dx : 0;
     player.vx = moveX * MOVE_SPEED;
@@ -311,7 +364,7 @@ function updatePlayer() {
     player.vy += GRAVITY;
     if (player.vy > 15) player.vy = 15;
 
-    // X
+    // Перемещение по X
     player.x += player.vx;
     for (let p of platforms) {
         if (rectCollide(player, p)) {
@@ -321,7 +374,7 @@ function updatePlayer() {
         }
     }
 
-    // Y
+    // Перемещение по Y
     player.y += player.vy;
     player.onGround = false;
     for (let p of platforms) {
@@ -338,21 +391,20 @@ function updatePlayer() {
     }
 
     // Границы уровня
-    if (player.x < 0) player.x = 0;
     const cols = LEVELS[currentLevel][0].length;
+    if (player.x < 0) player.x = 0;
     if (player.x + player.w > cols * TILE) {
         player.x = cols * TILE - player.w;
     }
 
-    // Падение в пропасть
+    // Падение в пропасть -> респавн
     if (player.y > 700) {
-        gameOver = true;
-        messageEl.textContent = '💀 Вы упали!';
-        messageEl.style.display = 'block';
+        respawning = true;
+        setTimeout(respawnPlayer, 300);
         return;
     }
 
-    // Монеты
+    // Сбор монет
     for (let coin of coins) {
         if (!coin.collected && rectCollide(player, coin)) {
             coin.collected = true;
@@ -374,9 +426,9 @@ function updatePlayer() {
                 enemy.alive = false;
                 player.vy = -6;
             } else {
-                gameOver = true;
-                messageEl.textContent = '💀 Вас убили!';
-                messageEl.style.display = 'block';
+                // Смерть от врага -> респавн
+                respawning = true;
+                setTimeout(respawnPlayer, 300);
                 return;
             }
         }
@@ -388,9 +440,9 @@ function updatePlayer() {
             currentLevel++;
             loadLevel(currentLevel);
         } else {
-            win = true;
             messageEl.textContent = '🏆 ПОБЕДА! Все уровни пройдены!';
             messageEl.style.display = 'block';
+            gameRunning = false;
         }
     }
 }
@@ -404,6 +456,7 @@ function draw() {
     const rows = LEVELS[currentLevel].length;
     const cols = LEVELS[currentLevel][0].length;
 
+    // Камера
     let camX = player.x - W/2 + player.w/2;
     camX = Math.max(0, Math.min(camX, cols * TILE - W));
     camera.x = camX;
@@ -478,13 +531,8 @@ function draw() {
 
     ctx.restore();
 
-    // Джойстики (поверх)
+    // Джойстики
     drawJoysticks();
-
-    if (gameOver || win) {
-        ctx.fillStyle = 'rgba(0,0,0,0.3)';
-        ctx.fillRect(0, 0, W, H);
-    }
 }
 
 // ============================================================
@@ -494,7 +542,6 @@ function drawJoysticks() {
     const cx = 100, cy = H - 120;
     const rx = W - 100, ry = H - 120;
 
-    // Левый
     ctx.beginPath();
     ctx.arc(cx, cy, JOYSTICK_RADIUS, 0, Math.PI*2);
     ctx.fillStyle = 'rgba(255,255,255,0.2)';
@@ -511,7 +558,6 @@ function drawJoysticks() {
         ctx.fill();
     }
 
-    // Правый (прыжок)
     ctx.beginPath();
     ctx.arc(rx, ry, JOYSTICK_RADIUS, 0, Math.PI*2);
     ctx.fillStyle = 'rgba(255,255,255,0.2)';
@@ -538,14 +584,15 @@ function getCanvasCoords(clientX, clientY) {
 
 function handleTouchStart(e) {
     e.preventDefault();
-    const touch = e.touches[0];
-    const pos = getCanvasCoords(touch.clientX, touch.clientY);
-    if (pos.x < W/2) {
-        leftJoystick.active = true;
-        updateJoystick(pos.x, pos.y);
-    } else {
-        jumpRequested = true;
-        rightJoystick.active = true;
+    for (let touch of e.changedTouches) {
+        const pos = getCanvasCoords(touch.clientX, touch.clientY);
+        if (pos.x < W/2) {
+            leftJoystick.active = true;
+            updateJoystick(pos.x, pos.y);
+        } else {
+            jumpRequested = true;
+            rightJoystick.active = true;
+        }
     }
 }
 
@@ -639,6 +686,7 @@ canvas.addEventListener('touchcancel', handleTouchEnd, { passive: false });
 restartBtn.addEventListener('click', () => {
     currentLevel = 0;
     score = 0;
+    gameRunning = true;
     loadLevel(currentLevel);
 });
 
@@ -646,7 +694,7 @@ restartBtn.addEventListener('click', () => {
 //   ЗАПУСК
 // ============================================================
 function gameLoop() {
-    updatePlayer();
+    if (gameRunning) updatePlayer();
     draw();
     requestAnimationFrame(gameLoop);
 }
